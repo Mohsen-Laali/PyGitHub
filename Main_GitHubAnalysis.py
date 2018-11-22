@@ -2,15 +2,20 @@
 from GitHubAnalysis import GitHubAnalysis
 
 if __name__ == '__main__':
-    t = 'start'
-    # repo_name = 'PyGithub/PyGithub'
 
+    # log_flag = True
+    # git_hub_user_name = 'M3N'
+    # git_hub_password = 'GitHub1'
+    # git_hub_analysis = GitHubAnalysis(git_hub_user_name=git_hub_user_name, git_hub_password=git_hub_password,
+    #                                   log_flag=log_flag)
+    # repo_name = 'PyGithub/PyGithub'
+    #
     # issue_label_name = 'bug'
     # file_name = 'elastic_search_bug_fix_commit.csv'
-
+    #
     # file_name = 't.json'
     # file_name = 't.csv'
-
+    #
     # git_hub_analysis.convert_json_csv('rx_java_bug_fix_issues.json', 'rx_java_bug_fix_issues.csv', ['issue_comments'])
     #
     # git_hub_analysis = GitHubAnalysis(git_hub_user_name=git_hub_user_name, git_hub_password=git_hub_password,
@@ -37,19 +42,19 @@ if __name__ == '__main__':
     # Get Bug Fix Issues
     ###########################
 
-    # log_flag = True
-    # git_hub_user_name = 'M3N'
-    # git_hub_password = 'GitHub1'
-    # git_hub_analysis = GitHubAnalysis(git_hub_user_name=git_hub_user_name, git_hub_password=git_hub_password,
-    #                                   log_flag=log_flag)
+    log_flag = True
+    git_hub_user_name = 'M3N'
+    git_hub_password = 'GitHub1'
+    git_hub_analysis = GitHubAnalysis(git_hub_user_name=git_hub_user_name, git_hub_password=git_hub_password,
+                                      log_flag=log_flag)
 
-    # repo_name = 'ReactiveX/RxJava'
-    # issue_label_name = 'Bug'
-    # file_name = 'rx_java_bug_fix_issues.json'
-    # git_hub_analysis.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
-    #                                           issue_label_name=issue_label_name)
-    # print repo_name + 'is finished'
-    #
+    repo_name = 'ReactiveX/RxJava'
+    issue_label_name = 'Bug'
+    file_name = 'rx_java_bug_fix_issues.json'
+    git_hub_analysis.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
+                                              issue_label_name=issue_label_name)
+    print(repo_name + 'is finished')
+
     # repo_name = 'elastic/elasticsearch'
     # issue_label_name = 'bug'
     # file_name = 'elastic_search_bug_fix_issues.json'
