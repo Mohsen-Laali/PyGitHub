@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import os
 import csv
+
 from github import Github
 import json
 from ssl import SSLError
@@ -17,7 +18,7 @@ class GitHubAnalysis:
 
     def log(self, log_str):
         if self.log_flag:
-            print log_str
+            print(log_str)
 
     def log_error(self, exception, extra=None):
         with open(self.error_log_file_name, 'a') as f_handler:
@@ -141,9 +142,7 @@ class GitHubAnalysis:
                     dictionary_data[html_url_fn] = issue_pull_request.html_url.encode('utf-8')
                     dictionary_data[patch_url_fn] = issue_pull_request.patch_url.encode('utf-8')
 
-                # write(line.encode('utf-8') + os.linesep)
-                # json.dump(dictionary_data, json_file)
-                json_file.write(json.dumps(dictionary_data, sort_keys=True))
+                json_file.write(json.dumps(dictionary_data))
                 json_file.write(os.linesep)
                 if self.log_flag:
                     self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
@@ -215,13 +214,13 @@ class GitHubAnalysis:
                 log_commit_ids = repo.git.log(all=True, grep=issue_title, pretty='format:%H', i=True,
                                               F=True)
                 if len(log_commit_ids) > 0:
-                    similar_commit_ids = map(lambda l: l.strip(), log_commit_ids.split(os.linesep))
+                    similar_commit_ids = [l.strip() for l in log_commit_ids.split(os.linesep)]
 
                     def filter_append(c):
                         if c and c not in set_discovered_commits:
                             set_similar_commit_ids.add(c)
 
-                    map(filter_append, similar_commit_ids)
+                    list(map(filter_append, similar_commit_ids))
                 json_line[field_similar_commit_to_issue_title] = list(set_similar_commit_ids)
                 result_issues_file_handler.write(json.dumps(json_line) + os.linesep)
                 self.log('******************************')
@@ -231,8 +230,8 @@ class GitHubAnalysis:
 
         def utf8_encode(to_encode):
             if type(to_encode) is list:
-                return map(lambda t: t.encode('utf8'), to_encode)
-            elif type(to_encode) is unicode:
+                return [t.encode('utf8') for t in to_encode]
+            elif type(to_encode) is str:
                 to_encode = to_encode.encode('utf8')
                 return to_encode
             else:
@@ -244,7 +243,7 @@ class GitHubAnalysis:
                 json_field_names.remove(col)
 
             # BOM (optional...Excel needs it to open UTF-8 file properly)
-            csv_file_handler.write(u'\ufeff'.encode('utf8'))
+            csv_file_handler.write('\ufeff'.encode('utf8'))
             # self.log(json_field_names)
             csv_writer = csv.DictWriter(csv_file_handler, fieldnames=json_field_names)
             csv_writer.writeheader()
@@ -253,4 +252,4 @@ class GitHubAnalysis:
                 for col in list_ignored_columns:
                     del json_line[col]
                 self.log(json_text)
-                csv_writer.writerow({k: utf8_encode(v) for k, v in json_line.items()})
+                csv_writer.writerow({k: utf8_encode(v) for k, v in list(json_line.items())})

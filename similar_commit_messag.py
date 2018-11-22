@@ -12,8 +12,8 @@ def find_similar_commit_message_to_issue_title(issues_json_file_address, result_
 
     def utf8_encode(to_encode):
         if type(to_encode) is list:
-            return map(lambda t: t.encode('utf8'), to_encode)
-        elif type(to_encode) is unicode:
+            return [t.encode('utf8') for t in to_encode]
+        elif type(to_encode) is str:
             to_encode = to_encode.encode('utf8')
             return to_encode
         else:
@@ -31,38 +31,38 @@ def find_similar_commit_message_to_issue_title(issues_json_file_address, result_
             # json_line = {k: utf8_encode(v) for k, v in json_line.items()}
             set_discovered_commits = set()
             if 'issue_closed_commit_id' in json_line:
-                map(set_discovered_commits.add, json_line['issue_closed_commit_id'])
+                list(map(set_discovered_commits.add, json_line['issue_closed_commit_id']))
             if 'issue_commit_id' in json_line:
-                map(set_discovered_commits.add, json_line['issue_commit_id'])
+                list(map(set_discovered_commits.add, json_line['issue_commit_id']))
             issue_title = json_line['issue_title']
-            print '&&&&&&&&&&&&&&&&&&&&&&&&&&'
-            print json_line['issue_number']
-            print '=========================='
-            print 'set of discovered commits'
-            print set_discovered_commits
-            print '++++++++++++++++++++++++++'
-            print 'issue_title'
-            print issue_title
-            print '##########################'
+            print('&&&&&&&&&&&&&&&&&&&&&&&&&&')
+            print((json_line['issue_number']))
+            print('==========================')
+            print('set of discovered commits')
+            print(set_discovered_commits)
+            print('++++++++++++++++++++++++++')
+            print('issue_title')
+            print(issue_title)
+            print('##########################')
             log_commit_ids = repo.git.log(all=True, grep=issue_title, pretty='format:%H', i=True, F=True)
-            print log_commit_ids.strip()
+            print((log_commit_ids.strip()))
 
             if len(log_commit_ids) > 0:
-                similar_commit_ids = map(lambda l: l.strip(), log_commit_ids.split(os.linesep))
-                print map(lambda l: l.strip(), log_commit_ids.split(os.linesep))
+                similar_commit_ids = [l.strip() for l in log_commit_ids.split(os.linesep)]
+                print( [l.strip() for l in log_commit_ids.split(os.linesep)])
 
                 def filter_append(c):
                     if c not in set_discovered_commits:
                         set_similar_commit_ids.add(c)
 
-                map(filter_append, similar_commit_ids)
+                list(map(filter_append, similar_commit_ids))
             json_line[field_similar_commit_to_issue_title] = set_similar_commit_ids
-            print {k: utf8_encode(v) for k, v in json_line.items()}
+            print({k: utf8_encode(v) for k, v in list(json_line.items())})
 
-            result_issues_file_handler.write(json.dumps({k: utf8_encode(v) for k, v in json_line.items()}) + os.linesep)
-            raw_input('press any key')
-            print json_line
-            raw_input('press any key')
+            result_issues_file_handler.write(json.dumps({k: utf8_encode(v) for k, v in list(json_line.items())}) + os.linesep)
+            eval(input('press any key'))
+            print(json_line)
+            eval(input('press any key'))
 
 
 repository_address = r'/home/mohsen/git/Human_Factor/Sample_Git_Repository/netty'
