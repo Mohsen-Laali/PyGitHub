@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import os
 import csv
+import datetime
 
 from github import Github
 import json
@@ -22,6 +23,8 @@ class GitHubAnalysis:
 
     def log_error(self, exception, extra=None):
         with open(self.error_log_file_name, 'a') as f_handler:
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            f_handler.write(current_time)
             f_handler.write(exception.message + os.linesep)
             f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
