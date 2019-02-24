@@ -1,7 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import os
 import csv
 import datetime
+import time
 
 from github import Github
 import json
@@ -29,7 +30,15 @@ class GitHubAnalysis:
             f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
+    def rate_limit_control(self, minimum_api_rate_limit=10):
+        while self.git_hub.rate_limiting[0] < minimum_api_rate_limit:
+            self.log("Reach rate limit ( " + str(self.git_hub.rate_limiting[0]) + "API call left )")
+            time.sleep(60)
+
     def find_issues(self, repo_name, issue_label_name='bug', state='closed'):
+
+        self.rate_limit_control()  # control api rate limit call
+
         repo = self.git_hub.get_repo(repo_name)
         if issue_label_name:
             issue_label_name = repo.get_label(issue_label_name)
@@ -48,19 +57,32 @@ class GitHubAnalysis:
             paginated_list_issues = self.find_issues(repo_name, issue_label_name, state)
             row_number = 1
 
+            self.rate_limit_control()  # control api rate limit call
+
             for issue in paginated_list_issues:
+
+                self.rate_limit_control()  # control api rate limit call
+
                 dictionary_data = dict()
                 dictionary_data[number] = row_number
                 dictionary_data[issue_title] = issue.title.encode('utf-8')
                 dictionary_data[repository_name] = issue.repository.full_name.encode('utf-8')
 
+                self.rate_limit_control()  # control api rate limit call
+
                 paginated_list_issue_events = issue.get_events()
                 dictionary_data[issue_commit_id] = ''
                 for issue_event in paginated_list_issue_events:
+
+                    self.rate_limit_control()  # control api rate limit call
+
                     if issue_event.event == 'merged':
                         dictionary_data[issue_commit_id] = issue_event.commit_id.encode('utf-8')
 
                 issue_pull_request = issue.pull_request
+
+                self.rate_limit_control()  # control api rate limit call
+
                 dictionary_data[diff_url] = ''
                 dictionary_data[html_url] = ''
                 dictionary_data[patch_url] = ''
@@ -96,21 +118,34 @@ class GitHubAnalysis:
             paginated_list_issues = self.find_issues(repo_name=repo_name, issue_label_name=issue_label_name,
                                                      state=state)
             row_number = 1
+
+            self.rate_limit_control()  # control api rate limit call
+
             for issue in paginated_list_issues:
+
+                self.rate_limit_control()  # control api rate limit call
+
                 dictionary_data = dict()
                 dictionary_data[number_fn] = row_number
                 dictionary_data[issue_number_fn] = issue.number
                 dictionary_data[issue_title_fn] = issue.title.encode('utf-8')
                 dictionary_data[repository_name_fn] = issue.repository.full_name.encode('utf-8')
 
+                self.rate_limit_control()  # control api rate limit call
+
                 paginated_list_issue_events = issue.get_events()
                 list_issue_commit_id = []
                 list_issue_closed_commit_id = []
                 for issue_event in paginated_list_issue_events:
+
+                    self.rate_limit_control()  # control api rate limit call
+
                     if issue_event.event == 'merged':
                         list_issue_commit_id.append(issue_event.commit_id.encode('utf-8'))
                     if issue_event.event == 'closed' and issue_event.commit_id:
                         list_issue_closed_commit_id.append(issue_event.commit_id.encode('utf-8'))
+
+                self.rate_limit_control()  # control api rate limit call
 
                 issue_labels = issue.get_labels()
                 list_issue_labels = []
@@ -138,6 +173,8 @@ class GitHubAnalysis:
                     dictionary_data[issue_commit_id_fn] = list_issue_commit_id
                 if len(list_issue_closed_commit_id):
                     dictionary_data[issue_closed_commit_id_fn] = list_issue_closed_commit_id
+
+                self.rate_limit_control()  # control api rate limit call
 
                 issue_pull_request = issue.pull_request
                 if issue_pull_request is not None:
