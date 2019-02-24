@@ -31,8 +31,11 @@ class GitHubAnalysis:
             f_handler.write('***********************' + os.linesep)
 
     def rate_limit_control(self, minimum_api_rate_limit=10):
+        waiting_time = 0
         while self.git_hub.rate_limiting[0] < minimum_api_rate_limit:
-            self.log("Reach rate limit ( " + str(self.git_hub.rate_limiting[0]) + "API call left )")
+            waiting_time += 1
+            self.log("Reach rate limit ( " + str(self.git_hub.rate_limiting[0]) +
+                     " API call left, wait time " + str(waiting_time) + " seconds)")
             time.sleep(60)
 
     def find_issues(self, repo_name, issue_label_name='bug', state='closed'):
