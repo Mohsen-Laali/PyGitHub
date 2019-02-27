@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import os
 import csv
-import datetime
-import time
+from datetime import datetime, timedelta  # Current time
+from time import sleep  # Waiting time before API reset
+from pytz import timezone  # API reset time zoon
+
 
 from github import Github
 import json
@@ -30,13 +32,31 @@ class GitHubAnalysis:
             f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
-    def rate_limit_control(self, minimum_api_rate_limit=10):
-        waiting_time = 0
-        while self.git_hub.rate_limiting[0] < minimum_api_rate_limit:
-            waiting_time += 1
-            self.log("Reach rate limit ( " + str(self.git_hub.rate_limiting[0]) +
-                     " API call left, wait time " + str(waiting_time) + " seconds)")
-            time.sleep(60)
+    def rate_limit_control(self, minimum_api_rate_limit=5):
+        sleeping_seconds = 0
+        core_call_left = self.git_hub.get_rate_limit().core.remaining
+        core_reset_time = self.git_hub.get_rate_limit().core.reset
+        search_call_left = self.git_hub.get_rate_limit().search.remaining
+        search_reset_time = self.git_hub.get_rate_limit().search.reset
+
+        # check API limit rate
+        if core_call_left < minimum_api_rate_limit or \
+           search_call_left < minimum_api_rate_limit:
+
+            # find the reset time
+            reset_time = core_reset_time
+            if reset_time < search_reset_time:
+                reset_time = search_reset_time
+            # Current time in the GitHub API time zone
+            current_time = datetime.now(timezone('UTC')).replace(tzinfo=None)
+            # Sleeping time with extra 30 seconds
+            sleeping_seconds = (reset_time - current_time).seconds + 30
+            self.log("Core Reach rate limit ( " + str(core_call_left) + " , " + str(core_reset_time) +
+                     " API call (left, to reset time (UTC)) " + os.linesep +
+                     "Search rate limit ( " + str(search_call_left) + " , " + str(search_reset_time) +
+                     " Core API call (left, to reset time (UTC)) " + os.linesep +
+                     "Waiting until " + str(datetime.now() + timedelta(seconds=sleeping_seconds)) + " )")
+            sleep(sleeping_seconds)
 
     def find_issues(self, repo_name, issue_label_name='bug', state='closed'):
 
