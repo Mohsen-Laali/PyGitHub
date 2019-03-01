@@ -20,7 +20,7 @@ class GitHubAnalysis:
         self.log_flag = log_flag
         self.error_log_file_name = 'error_log.txt'
         self.waiting_between_request = 1  # second
-        self.waiting_after_many_request = (1000, 60)  # (Number of request, Waiting time (seconds))
+        self.waiting_after_many_request = (1000, 600)  # (Number of request, Waiting time (seconds))
         self.rate_limit_count = 0
 
     def log(self, log_str):
@@ -44,6 +44,9 @@ class GitHubAnalysis:
         # waiting after many requests
         self.rate_limit_count += 1
         if self.rate_limit_count == self.waiting_after_many_request[0]:
+            self.log('Waiting for ' + str(self.waiting_after_many_request[1]) + ' second(s) after ' +
+                     str(self.waiting_after_many_request[0]) + ' call(s)')
+            self.log('Current time ' + str(datetime.now()))
             sleep(self.waiting_after_many_request[1])
 
         core_call_left = self.git_hub.get_rate_limit().core.remaining
