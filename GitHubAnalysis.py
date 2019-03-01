@@ -19,6 +19,9 @@ class GitHubAnalysis:
         self.git_hub = Github(git_hub_user_name, git_hub_password)
         self.log_flag = log_flag
         self.error_log_file_name = 'error_log.txt'
+        self.waiting_between_request = 1  # second
+        self.waiting_after_many_request = (1000, 60)  # (Number of request, Waiting time (seconds))
+        self.rate_limit_count = 0
 
     def log(self, log_str):
         if self.log_flag:
@@ -33,7 +36,9 @@ class GitHubAnalysis:
             f_handler.write('***********************' + os.linesep)
 
     def rate_limit_control(self, minimum_api_rate_limit=5):
-        sleeping_seconds = 0
+
+        self.rate_limit_count += 1
+        sleep()
         core_call_left = self.git_hub.get_rate_limit().core.remaining
         core_reset_time = self.git_hub.get_rate_limit().core.reset
         search_call_left = self.git_hub.get_rate_limit().search.remaining
@@ -61,6 +66,13 @@ class GitHubAnalysis:
     def find_issues(self, repo_name, issue_label_name='bug', state='closed'):
 
         self.rate_limit_control()  # control api rate limit call
+
+        sleep(self.waiting_between_request)  # politeness waiting
+
+        # waiting after many requests
+        self.rate_limit_count += 1
+        if self.rate_limit_count == self.waiting_after_many_request[0]:
+            sleep(self.waiting_after_many_request[1])
 
         repo = self.git_hub.get_repo(repo_name)
         if issue_label_name:
