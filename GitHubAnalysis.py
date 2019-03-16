@@ -15,24 +15,36 @@ from git.exc import GitCommandError
 
 
 class GitHubAnalysis:
-    def __init__(self, git_hub_user_name, git_hub_password, log_flag=False):
+    def __init__(self, git_hub_user_name, git_hub_password, log_flag=False, waiting_between_request=1,
+                 waiting_after_many_request=(1000, 600), waiting_after_exception=600,
+                 error_log_file_name='error_log.txt'):
         self.git_hub = Github(git_hub_user_name, git_hub_password)
         self.log_flag = log_flag
-        self.error_log_file_name = 'error_log.txt'
-        self.waiting_between_request = 1  # second
-        self.waiting_after_many_request = (1000, 600)  # (Number of request, Waiting time (seconds))
+        self.error_log_file_name = error_log_file_name
+        self.waiting_between_request = waiting_between_request  # second
+        self.waiting_after_many_request = waiting_after_many_request  # (Number of request, Waiting time (seconds))
         self.rate_limit_count = 0
+        self.exception_number = 0  # the exception number shows number time function is called,
+        # sub-exception shows the number of exception exception
+
+        self.waiting_after_exception = waiting_after_exception  # the waiting time after exception
 
     def log(self, log_str):
         if self.log_flag:
             print(log_str)
 
-    def log_error(self, exception, extra=None):
+    def log_error(self, exception, extra=None, starter=None):
         with open(self.error_log_file_name, 'a') as f_handler:
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            if starter is not None:
+                f_handler.write(starter + os.linesep)
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
             f_handler.write(current_time)
-            f_handler.write(exception.message + os.linesep)
-            f_handler.write(extra + os.linesep)
+            if hasattr(exception, 'message'):
+                f_handler.write(exception.message + os.linesep)
+            else:
+                f_handler.write(exception + os.linesep)
+            if extra is not None:
+                f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
     def rate_limit_control(self, minimum_api_rate_limit=5):
@@ -140,6 +152,22 @@ class GitHubAnalysis:
                 self.log('+++++++++++++++')
                 row_number += 1
 
+    def write_issue_to_json_file_exception_proof(self, file_name, repo_name, issue_label_name='bug', state='closed'):
+
+        sub_exception_number = 0
+        self.exception_number += 1
+        continue_the_loop = True
+        while continue_the_loop:
+            try:
+                self.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
+                                              issue_label_name=issue_label_name, state=state)
+                continue_the_loop = False
+            except Exception as e:
+                sub_exception_number += 1
+                starter = str(self.exception_number)+'.'+str(sub_exception_number)+'- '
+                self.log_error(exception=e, starter=starter)
+                sleep(self.waiting_after_exception)
+
     def write_issue_to_json_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
         with open(file_name, 'w+') as json_file:
             fields_names = ['number', 'issue_number', 'repository_name', 'issue_title', 'issue_labels',
@@ -198,8 +226,9 @@ class GitHubAnalysis:
 
                 if len(list_issue_labels):
                     dictionary_data[issue_labels_fn] = list_issue_labels
+                list_issue_comments = []
                 if issue.body:
-                    list_issue_comments = [issue.body.encode('utf-8')]
+                    list_issue_comments.append(issue.body.encode('utf-8'))
                 paginated_list_comments = issue.get_comments()
                 for issue_comment in paginated_list_comments:
                     list_issue_comments.append(issue_comment.body.encode('utf-8'))
@@ -304,7 +333,10 @@ class GitHubAnalysis:
                 self.log('******************************')
                 self.log(json_line)
 
-    def convert_json_csv(self, json_file_address, csv_file_address, list_ignored_columns=[]):
+    def convert_json_csv(self, json_file_address, csv_file_address, list_ignored_columns=None):
+
+        if list_ignored_columns is None:
+            list_ignored_columns = []
 
         def utf8_encode(to_encode):
             if type(to_encode) is list:
