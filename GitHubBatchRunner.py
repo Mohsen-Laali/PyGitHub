@@ -8,7 +8,7 @@ from GitHubAnalysis import GitHubAnalysis
 
 
 class Repo:
-    def __init__(self, repo_name, bug_issue_labels = None):
+    def __init__(self, repo_name, bug_issue_labels=None):
         if not bug_issue_labels:
             self.bug_issue_labels = []
         self.repo_labels = bug_issue_labels
@@ -41,9 +41,9 @@ class GitHubBatchRunner:
             if starter is not None:
                 f_handler.write(starter + os.linesep)
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-            f_handler.write(current_time)
+            f_handler.write(current_time+os.linesep)
             if hasattr(exception, 'message'):
-                f_handler.write(exception.message + os.linesep)
+                f_handler.write(str(exception.message) + os.linesep)
             else:
                 f_handler.write(exception + os.linesep)
             if extra is not None:
@@ -83,7 +83,8 @@ class GitHubBatchRunner:
         for repo in list_repos:
             file_name = repo.repo_name.split(r'/').pop() + '_issues.json'
             file_address = os.path.join(self.output_folder, file_name)
-            self.github_analysis.write_issue_to_json_file_exception_proof(file_name=file_address, repo_name=repo,
+            self.github_analysis.write_issue_to_json_file_exception_proof(file_name=file_address,
+                                                                          repo_name=repo.repo_name,
                                                                           issue_label_name=None)
             bug_issue_labels = repo.bug_issue_labels
             if bug_issue_labels:

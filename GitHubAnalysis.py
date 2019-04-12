@@ -15,7 +15,7 @@ from git.exc import GitCommandError
 
 
 class GitHubAnalysis:
-    def __init__(self, git_hub_user_name, git_hub_password, log_flag=False, waiting_between_request=1,
+    def __init__(self, git_hub_user_name, git_hub_password, log_flag=False, waiting_between_request=0,
                  waiting_after_many_request=(1000, 600), waiting_after_exception=600,
                  error_log_file_name='error_log.txt'):
         self.git_hub = Github(git_hub_user_name, git_hub_password)
@@ -38,9 +38,9 @@ class GitHubAnalysis:
             if starter is not None:
                 f_handler.write(starter + os.linesep)
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-            f_handler.write(current_time)
+            f_handler.write(current_time + os.linesep)
             if hasattr(exception, 'message'):
-                f_handler.write(exception.message + os.linesep)
+                f_handler.write(str(exception.message) + os.linesep)
             else:
                 f_handler.write(exception + os.linesep)
             if extra is not None:

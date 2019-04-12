@@ -1,14 +1,14 @@
+#! ./venv/bin/python
 from GitHubBatchRunner import GitHubBatchRunner
-import os
 
 if __name__ == '__main__':
-    batch_file = "repo_names.json"
-    output_folder = r'./output/all_issues_c_repositories'
+    batch_file = "c_repo_names.json"
+    output_folder = r'./Output/all_issues_c_repositories'
 
     github_user_name = 'M3N'
     github_password = 'GitHub1'
     log_flag = True
-    error_log_file_name = r'error_log_file.txt'
+    error_log_file_name = r'error_log.txt'
     amend_result = True
     temp_folder = None
 
