@@ -3,7 +3,7 @@ import os
 import csv
 from datetime import datetime, timedelta  # Current time
 from time import sleep  # Waiting time before API reset
-from pytz import timezone  # API reset time zoon
+from pytz import timezone  # API reset timezone
 
 
 from github import Github
@@ -45,6 +45,7 @@ class GitHubAnalysis:
                 f_handler.write(exception + os.linesep)
             if extra is not None:
                 f_handler.write(extra + os.linesep)
+            f_handler.write(str(exception) + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
     def rate_limit_control(self, minimum_api_rate_limit=5):
