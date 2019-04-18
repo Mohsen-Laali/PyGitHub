@@ -58,7 +58,8 @@ class GitHubAnalysis:
         self.core_api_left_tracker -= api_call
         sleep(self.waiting_between_request)  # politeness waiting
 
-        if self.core_api_left_tracker < self.core_api_threshold or self.core_api_threshold == -1:
+        if self.core_api_left_tracker < self.core_api_threshold or self.core_api_threshold == -1 or \
+           self.core_api_left_tracker < minimum_api_rate_limit:
 
             # waiting after many requests
             if self.rate_limit_count == self.waiting_after_many_request[0]:
@@ -169,6 +170,7 @@ class GitHubAnalysis:
                 self.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
                                               issue_label_name=issue_label_name, state=state)
                 continue_the_loop = False
+                self.core_api_left_tracker
             except Exception as e:
                 extra = traceback.format_exc()
                 sub_exception_number += 1
@@ -176,6 +178,7 @@ class GitHubAnalysis:
                 self.log(log_str=starter + os.linesep + extra)
                 self.log(log_str='***********************' + os.linesep)
                 self.log_error(exception=e, starter=starter, extra=extra)
+                self.core_api_left_tracker = 0
                 sleep(self.waiting_after_exception)
 
     def write_issue_to_json_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
