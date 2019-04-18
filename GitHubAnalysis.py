@@ -56,7 +56,6 @@ class GitHubAnalysis:
 
         self.rate_limit_count += api_call
         self.core_api_left_tracker -= api_call
-        print(self.waiting_between_request)
         sleep(self.waiting_between_request)  # politeness waiting
 
         if self.core_api_left_tracker < self.core_api_threshold or self.core_api_threshold == -1:
