@@ -4,6 +4,7 @@ import csv
 from datetime import datetime, timedelta  # Current time
 from time import sleep  # Waiting time before API reset
 from pytz import timezone  # API reset timezone
+import traceback
 
 
 from github import Github
@@ -16,7 +17,7 @@ from git.exc import GitCommandError
 
 class GitHubAnalysis:
     def __init__(self, git_hub_user_name, git_hub_password, log_flag=False, waiting_between_request=0,
-                 waiting_after_many_request=(1000, 600), waiting_after_exception=600,
+                 waiting_after_many_request=(1000, 600), waiting_after_exception=300, core_api_threshold=50,
                  error_log_file_name='error_log.txt'):
         self.git_hub = Github(git_hub_user_name, git_hub_password)
         self.log_flag = log_flag
@@ -28,6 +29,10 @@ class GitHubAnalysis:
         # sub-exception shows the number of exception exception
 
         self.waiting_after_exception = waiting_after_exception  # the waiting time after exception
+
+        self.core_api_threshold = core_api_threshold  # only check the api limit from github if the number jump
+        # below this number of core api thresholds
+        self.core_api_left_tracker = 0  # keep tracker of api call
 
     def log(self, log_str):
         if self.log_flag:
@@ -43,55 +48,59 @@ class GitHubAnalysis:
                 f_handler.write(str(exception.message) + os.linesep)
             else:
                 f_handler.write(exception + os.linesep)
+            f_handler.write(str(exception) + os.linesep)
             if extra is not None:
                 f_handler.write(extra + os.linesep)
-            f_handler.write(str(exception) + os.linesep)
+
             f_handler.write('***********************' + os.linesep)
 
-    def rate_limit_control(self, minimum_api_rate_limit=5):
+    def rate_limit_control(self, minimum_api_rate_limit=5, api_call=1):
 
-        self.rate_limit_count += 1
-
+        self.rate_limit_count += api_call
+        self.core_api_left_tracker -= api_call
+        print(self.waiting_between_request)
         sleep(self.waiting_between_request)  # politeness waiting
 
-        # waiting after many requests
-        self.rate_limit_count += 1
-        if self.rate_limit_count == self.waiting_after_many_request[0]:
-            self.log('Waiting for ' + str(self.waiting_after_many_request[1]) + ' second(s) after ' +
-                     str(self.waiting_after_many_request[0]) + ' call(s)')
-            self.log('Current time ' + str(datetime.now()))
-            sleep(self.waiting_after_many_request[1])
+        if self.core_api_left_tracker < self.core_api_threshold or self.core_api_threshold == -1:
 
-        core_call_left = self.git_hub.get_rate_limit().core.remaining
-        core_reset_time = self.git_hub.get_rate_limit().core.reset
-        search_call_left = self.git_hub.get_rate_limit().search.remaining
-        search_reset_time = self.git_hub.get_rate_limit().search.reset
+            # waiting after many requests
+            if self.rate_limit_count == self.waiting_after_many_request[0]:
+                self.log('Waiting for ' + str(self.waiting_after_many_request[1]) + ' second(s) after ' +
+                         str(self.waiting_after_many_request[0]) + ' call(s)')
+                self.log('Current time ' + str(datetime.now()))
+                sleep(self.waiting_after_many_request[1])
 
-        # check API limit rate
-        if core_call_left < minimum_api_rate_limit or \
-           search_call_left < minimum_api_rate_limit:
+            core_call_left = self.git_hub.get_rate_limit().core.remaining
+            core_reset_time = self.git_hub.get_rate_limit().core.reset
+            search_call_left = self.git_hub.get_rate_limit().search.remaining
+            search_reset_time = self.git_hub.get_rate_limit().search.reset
 
-            # find the reset time
-            reset_time = core_reset_time
-            if reset_time < search_reset_time:
-                reset_time = search_reset_time
-            # Current time in the GitHub API time zone
-            current_time = datetime.now(timezone('UTC')).replace(tzinfo=None)
-            # Sleeping time with extra 30 seconds
-            sleeping_seconds = (reset_time - current_time).seconds + 30
-            self.log("Core Reach rate limit ( " + str(core_call_left) + " , " + str(core_reset_time) +
-                     " API call (left, to reset time (UTC)) " + os.linesep +
-                     "Search rate limit ( " + str(search_call_left) + " , " + str(search_reset_time) +
-                     " Core API call (left, to reset time (UTC)) " + os.linesep +
-                     "Waiting until " + str(datetime.now() + timedelta(seconds=sleeping_seconds)) + " )")
-            sleep(sleeping_seconds)
+            self.core_api_left_tracker = core_call_left
+
+            # check API limit rate
+            if core_call_left < minimum_api_rate_limit or \
+               search_call_left < minimum_api_rate_limit:
+
+                # find the reset time
+                reset_time = core_reset_time
+                if reset_time < search_reset_time:
+                    reset_time = search_reset_time
+                # Current time in the GitHub API time zone
+                current_time = datetime.now(timezone('UTC')).replace(tzinfo=None)
+                # Sleeping time with extra 30 seconds
+                sleeping_seconds = (reset_time - current_time).seconds + 30
+                self.log("Core Reach rate limit ( " + str(core_call_left) + " , " + str(core_reset_time) +
+                         " API call (left, to reset time (UTC)) " + os.linesep +
+                         "Search rate limit ( " + str(search_call_left) + " , " + str(search_reset_time) +
+                         " Core API call (left, to reset time (UTC)) " + os.linesep +
+                         "Waiting until " + str(datetime.now() + timedelta(seconds=sleeping_seconds)) + " )")
+                sleep(sleeping_seconds)
 
     def find_issues(self, repo_name, issue_label_name='bug', state='closed'):
-
         self.rate_limit_control()  # control api rate limit call
-
         repo = self.git_hub.get_repo(repo_name)
         if issue_label_name:
+            self.rate_limit_control()  # control api rate limit call
             issue_label_name = repo.get_label(issue_label_name)
             paginated_list_issues = repo.get_issues(state=state, labels=[issue_label_name])
         else:
@@ -159,15 +168,16 @@ class GitHubAnalysis:
         self.exception_number += 1
         continue_the_loop = True
         while continue_the_loop:
-            try:
+            # try:
                 self.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
                                               issue_label_name=issue_label_name, state=state)
                 continue_the_loop = False
-            except Exception as e:
-                sub_exception_number += 1
-                starter = str(self.exception_number)+'.'+str(sub_exception_number)+'- '
-                self.log_error(exception=e, starter=starter)
-                sleep(self.waiting_after_exception)
+            # except Exception as e:
+            #     raise e
+            #     sub_exception_number += 1
+            #     starter = str(self.exception_number)+'.'+str(sub_exception_number)+'- '
+            #     self.log_error(exception=e, starter=starter,)
+            #     sleep(self.waiting_after_exception)
 
     def write_issue_to_json_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
         with open(file_name, 'w+') as json_file:
@@ -185,54 +195,63 @@ class GitHubAnalysis:
             paginated_list_issues = self.find_issues(repo_name=repo_name, issue_label_name=issue_label_name,
                                                      state=state)
             row_number = 1
+            self.rate_limit_control()  # control api rate limit call TODO redundant
 
-            self.rate_limit_control()  # control api rate limit call
-
+            repo_full_name = None
             for issue in paginated_list_issues:
 
-                self.rate_limit_control()  # control api rate limit call
+                self.rate_limit_control()  # control api rate limit call (might redundant, only the api call first time)
 
                 dictionary_data = dict()
                 dictionary_data[number_fn] = row_number
-                dictionary_data[issue_number_fn] = issue.number
-                dictionary_data[issue_title_fn] = issue.title.encode('utf-8')
-                dictionary_data[repository_name_fn] = issue.repository.full_name.encode('utf-8')
 
-                self.rate_limit_control()  # control api rate limit call
+                dictionary_data[issue_number_fn] = issue.number
+
+                dictionary_data[issue_title_fn] = issue.title.encode('utf-8')
+
+                if not repo_full_name:
+                    repo_full_name = issue.repository.full_name.encode('utf-8')
+                    dictionary_data[repository_name_fn] = repo_full_name
+                    self.rate_limit_control(api_call=2)  # control api rate limit call
 
                 paginated_list_issue_events = issue.get_events()
+
                 list_issue_commit_id = []
                 list_issue_closed_commit_id = []
                 for issue_event in paginated_list_issue_events:
-
-                    self.rate_limit_control()  # control api rate limit call
 
                     if issue_event.event == 'merged':
                         list_issue_commit_id.append(issue_event.commit_id.encode('utf-8'))
                     if issue_event.event == 'closed' and issue_event.commit_id:
                         list_issue_closed_commit_id.append(issue_event.commit_id.encode('utf-8'))
-
-                self.rate_limit_control()  # control api rate limit call
+                else:
+                    self.rate_limit_control()  # control api rate limit call
 
                 issue_labels = issue.get_labels()
+
                 list_issue_labels = []
                 try:
                     for issue_label in issue_labels:
                         list_issue_labels.append(issue_label.name)
+                    else:
+                        self.rate_limit_control()  # control api rate limit call
                 except SSLError as e:
                     extra = dictionary_data[repository_name_fn] + os.linesep + dictionary_data[issue_title_fn] \
                             + os.linesep + traceback.format_exc() + os.linesep
                     self.log_error(e, extra)
-                    continue
-
+                    raise e
                 if len(list_issue_labels):
                     dictionary_data[issue_labels_fn] = list_issue_labels
+
                 list_issue_comments = []
                 if issue.body:
                     list_issue_comments.append(issue.body.encode('utf-8'))
+
                 paginated_list_comments = issue.get_comments()
                 for issue_comment in paginated_list_comments:
                     list_issue_comments.append(issue_comment.body.encode('utf-8'))
+                else:
+                    self.rate_limit_control()  # control api rate limit call
 
                 if len(list_issue_comments):
                     dictionary_data[issue_comments_fn] = list_issue_comments
@@ -241,8 +260,6 @@ class GitHubAnalysis:
                     dictionary_data[issue_commit_id_fn] = list_issue_commit_id
                 if len(list_issue_closed_commit_id):
                     dictionary_data[issue_closed_commit_id_fn] = list_issue_closed_commit_id
-
-                self.rate_limit_control()  # control api rate limit call
 
                 issue_pull_request = issue.pull_request
                 if issue_pull_request is not None:

@@ -17,7 +17,8 @@ class Repo:
 
 class GitHubBatchRunner:
     def __init__(self, batch_file, output_folder, github_user_name, github_password, log_flag=True,
-                 error_log_file_name='error_log.txt', amend_result=True, temp_folder='tempt'):
+                 error_log_file_name='error_log.txt', amend_result=True, temp_folder='tempt', waiting_between_request=0,
+                 waiting_after_many_request=(1000, 600), waiting_after_exception=300, core_api_threshold=50):
 
         self.batch_file = batch_file
         self.output_folder = output_folder
@@ -30,7 +31,12 @@ class GitHubBatchRunner:
 
         self.github = Github(login_or_token=github_user_name, password=github_password)
         self.github_analysis = GitHubAnalysis(git_hub_user_name=github_user_name,
-                                              git_hub_password=github_password, log_flag=log_flag)
+                                              git_hub_password=github_password, log_flag=log_flag,
+                                              waiting_between_request=waiting_between_request,
+                                              waiting_after_many_request=waiting_after_many_request,
+                                              waiting_after_exception=waiting_after_exception,
+                                              core_api_threshold=core_api_threshold,
+                                              error_log_file_name=error_log_file_name)
 
     def log(self, log_str):
         if self.log_flag:
@@ -46,9 +52,9 @@ class GitHubBatchRunner:
                 f_handler.write(str(exception.message) + os.linesep)
             else:
                 f_handler.write(exception + os.linesep)
+            f_handler.write(str(exception) + os.linesep)
             if extra is not None:
                 f_handler.write(extra + os.linesep)
-            f_handler.write(str(exception) + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
     def creat_folder(self, folder_path):
