@@ -48,10 +48,8 @@ class GitHubAnalysis:
                 f_handler.write(str(exception.message) + os.linesep)
             else:
                 f_handler.write(exception + os.linesep)
-            f_handler.write(str(exception) + os.linesep)
             if extra is not None:
                 f_handler.write(extra + os.linesep)
-
             f_handler.write('***********************' + os.linesep)
 
     def rate_limit_control(self, minimum_api_rate_limit=5, api_call=1):
@@ -168,16 +166,18 @@ class GitHubAnalysis:
         self.exception_number += 1
         continue_the_loop = True
         while continue_the_loop:
-            # try:
+            try:
                 self.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
                                               issue_label_name=issue_label_name, state=state)
                 continue_the_loop = False
-            # except Exception as e:
-            #     raise e
-            #     sub_exception_number += 1
-            #     starter = str(self.exception_number)+'.'+str(sub_exception_number)+'- '
-            #     self.log_error(exception=e, starter=starter,)
-            #     sleep(self.waiting_after_exception)
+            except Exception as e:
+                extra = traceback.format_exc()
+                sub_exception_number += 1
+                starter = str(self.exception_number)+'.'+str(sub_exception_number)+'- '
+                self.log(log_str=starter + os.linesep + extra)
+                self.log(log_str='***********************' + os.linesep)
+                self.log_error(exception=e, starter=starter, extra=extra)
+                sleep(self.waiting_after_exception)
 
     def write_issue_to_json_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
         with open(file_name, 'w+') as json_file:
@@ -230,16 +230,16 @@ class GitHubAnalysis:
                 issue_labels = issue.get_labels()
 
                 list_issue_labels = []
-                try:
-                    for issue_label in issue_labels:
-                        list_issue_labels.append(issue_label.name)
-                    else:
-                        self.rate_limit_control()  # control api rate limit call
-                except SSLError as e:
-                    extra = dictionary_data[repository_name_fn] + os.linesep + dictionary_data[issue_title_fn] \
-                            + os.linesep + traceback.format_exc() + os.linesep
-                    self.log_error(e, extra)
-                    raise e
+                # try:
+                for issue_label in issue_labels:
+                    list_issue_labels.append(issue_label.name)
+                else:
+                    self.rate_limit_control()  # control api rate limit call
+                # except SSLError as e:
+                #     extra = dictionary_data[repository_name_fn] + os.linesep + dictionary_data[issue_title_fn] \
+                #             + os.linesep + traceback.format_exc() + os.linesep
+                #     self.log_error(e, extra)
+                #     raise e
                 if len(list_issue_labels):
                     dictionary_data[issue_labels_fn] = list_issue_labels
 

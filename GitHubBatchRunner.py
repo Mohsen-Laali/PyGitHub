@@ -2,6 +2,7 @@ import os
 import shutil
 from datetime import datetime
 import json
+import traceback
 
 from github import Github
 from GitHubAnalysis import GitHubAnalysis
@@ -52,8 +53,7 @@ class GitHubBatchRunner:
                 f_handler.write(str(exception.message) + os.linesep)
             else:
                 f_handler.write(exception + os.linesep)
-            f_handler.write(str(exception) + os.linesep)
-            if extra is not None:
+            if extra:
                 f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
@@ -61,9 +61,12 @@ class GitHubBatchRunner:
         try:
             os.makedirs(folder_path)
         except OSError as e:
+            extra = traceback.format_exc()
             error_message = "Creation of the directory " + folder_path + " failed"
             self.log(log_str=error_message)
-            self.log_error(exception=e, starter=error_message)
+            self.log(log_str=extra)
+            self.log(log_str='***********************' + os.linesep)
+            self.log_error(exception=e, starter=error_message, extra=extra)
             raise e
         else:
             message = "Successfully created the directory " + folder_path
@@ -73,8 +76,11 @@ class GitHubBatchRunner:
         try:
             shutil.rmtree(folder_path)
         except OSError as e:
+            extra = traceback.format_exc()
             error_message = "Deletion of the directory " + folder_path + "  failed"
             self.log(log_str=error_message)
+            self.log(log_str=extra)
+            self.log(log_str='***********************' + os.linesep)
             self.log_error(exception=e, starter=error_message)
             raise e
         else:
@@ -112,9 +118,12 @@ class GitHubBatchRunner:
                 message = 'Repo: ' + repo_name + ' is retrieved successfully'
                 self.log(log_str=message)
             except Exception as e:
+                extra = traceback.format_exc()
                 message = 'Repo ' + repo_name + ' is not accessible'
                 self.log(log_str=message)
-                self.log_error(exception=e, starter=message)
+                self.log(log_str=extra)
+                self.log(log_str='***********************' + os.linesep)
+                self.log_error(exception=e, starter=message, extra=extra)
                 raise e
             try:
                 bug_issue_labels = json_repo['bug_issue_labels']
@@ -124,9 +133,12 @@ class GitHubBatchRunner:
                     message = 'Repo: ' + bug_issue_label + ' is retrieved successfully'
                     self.log(log_str=message)
             except Exception as e:
+                extra = traceback.format_exc()
                 message = 'Bug issue label ' + bug_issue_label + ' is not accessible'
                 self.log(log_str=message)
-                self.log_error(exception=e, starter=message)
+                self.log(log_str=extra)
+                self.log(log_str='***********************' + os.linesep)
+                self.log_error(exception=e, starter=message, extra=extra)
                 raise e
         return list_repos
 
