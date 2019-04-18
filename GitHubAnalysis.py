@@ -210,8 +210,9 @@ class GitHubAnalysis:
 
                 if not repo_full_name:
                     repo_full_name = issue.repository.full_name.encode('utf-8')
-                    dictionary_data[repository_name_fn] = repo_full_name
                     self.rate_limit_control(api_call=2)  # control api rate limit call
+
+                dictionary_data[repository_name_fn] = repo_full_name
 
                 paginated_list_issue_events = issue.get_events()
 
