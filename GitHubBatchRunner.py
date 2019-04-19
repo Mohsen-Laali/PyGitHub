@@ -94,7 +94,7 @@ class GitHubBatchRunner:
             self.creat_folder(folder_path=self.output_folder)
         for repo in list_repos:
             current_time = datetime.now().strftime("%Y_%m_%d")
-            file_name = repo.repo_name.split(r'/').pop() + '_' + current_time + '_issues.json'
+            file_name = repo.repo_name.split(r'/').pop() + '_issues_' + current_time + '.json'
             file_address = os.path.join(self.output_folder, file_name)
             self.github_analysis.write_issue_to_json_file_exception_proof(file_name=file_address,
                                                                           repo_name=repo.repo_name,
