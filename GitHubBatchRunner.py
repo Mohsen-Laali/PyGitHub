@@ -45,14 +45,14 @@ class GitHubBatchRunner:
 
     def log_error(self, exception, starter=None, extra=None):
         with open(self.error_log_file_name, 'a') as f_handler:
-            if starter is not None:
+            if starter:
                 f_handler.write(starter + os.linesep)
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-            f_handler.write(current_time+os.linesep)
-            if hasattr(exception, 'message'):
+            f_handler.write(current_time + os.linesep)
+            if hasattr(exception, 'message') and exception:
                 f_handler.write(str(exception.message) + os.linesep)
-            else:
-                f_handler.write(exception + os.linesep)
+            elif exception:
+                f_handler.write(str(exception) + os.linesep)
             if extra:
                 f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
@@ -93,7 +93,8 @@ class GitHubBatchRunner:
         if not os.path.exists(self.output_folder):
             self.creat_folder(folder_path=self.output_folder)
         for repo in list_repos:
-            file_name = repo.repo_name.split(r'/').pop() + '_issues.json'
+            current_time = datetime.now().strftime("%Y_%m_%d")
+            file_name = repo.repo_name.split(r'/').pop() + '_' + current_time + '_issues.json'
             file_address = os.path.join(self.output_folder, file_name)
             self.github_analysis.write_issue_to_json_file_exception_proof(file_name=file_address,
                                                                           repo_name=repo.repo_name,

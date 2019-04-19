@@ -40,15 +40,15 @@ class GitHubAnalysis:
 
     def log_error(self, exception, extra=None, starter=None):
         with open(self.error_log_file_name, 'a') as f_handler:
-            if starter is not None:
+            if starter:
                 f_handler.write(starter + os.linesep)
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
             f_handler.write(current_time + os.linesep)
-            if hasattr(exception, 'message'):
+            if hasattr(exception, 'message') and exception:
                 f_handler.write(str(exception.message) + os.linesep)
-            else:
-                f_handler.write(exception + os.linesep)
-            if extra is not None:
+            elif exception:
+                f_handler.write(str(exception) + os.linesep)
+            if extra:
                 f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
@@ -85,13 +85,15 @@ class GitHubAnalysis:
                     reset_time = search_reset_time
                 # Current time in the GitHub API time zone
                 current_time = datetime.now(timezone('UTC')).replace(tzinfo=None)
-                # Sleeping time with extra 30 seconds
-                sleeping_seconds = (reset_time - current_time).seconds + 30
-                self.log("Core Reach rate limit ( " + str(core_call_left) + " , " + str(core_reset_time) +
-                         " API call (left, to reset time (UTC)) " + os.linesep +
-                         "Search rate limit ( " + str(search_call_left) + " , " + str(search_reset_time) +
-                         " Core API call (left, to reset time (UTC)) " + os.linesep +
-                         "Waiting until " + str(datetime.now() + timedelta(seconds=sleeping_seconds)) + " )")
+                # Sleeping time with extra 600 seconds
+                sleeping_seconds = (reset_time - current_time).seconds + 600
+                log = ("Core Reach rate limit ( " + str(core_call_left) + " , " + str(core_reset_time) +
+                       " API call (left, to reset time (UTC)) " + os.linesep +
+                       "Search rate limit ( " + str(search_call_left) + " , " + str(search_reset_time) +
+                       " Core API call (left, to reset time (UTC)) " + os.linesep +
+                       "Waiting until " + str(datetime.now() + timedelta(seconds=sleeping_seconds)) + " )")
+                self.log(log_str=log)
+                self.log_error(exception=None, starter=None, extra=log)
                 sleep(sleeping_seconds)
 
     def find_issues(self, repo_name, issue_label_name='bug', state='closed'):
@@ -170,7 +172,8 @@ class GitHubAnalysis:
                 self.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
                                               issue_label_name=issue_label_name, state=state)
                 continue_the_loop = False
-                self.core_api_left_tracker
+                self.core_api_left_tracker = 0
+                self.rate_limit_control()
             except Exception as e:
                 extra = traceback.format_exc()
                 sub_exception_number += 1
@@ -180,6 +183,7 @@ class GitHubAnalysis:
                 self.log_error(exception=e, starter=starter, extra=extra)
                 self.core_api_left_tracker = 0
                 sleep(self.waiting_after_exception)
+                self.rate_limit_control()
 
     def write_issue_to_json_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
         with open(file_name, 'w+') as json_file:
