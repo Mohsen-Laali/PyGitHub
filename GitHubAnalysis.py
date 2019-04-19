@@ -107,50 +107,6 @@ class GitHubAnalysis:
             paginated_list_issues = repo.get_issues(state=state)
         return paginated_list_issues
 
-    def write_bug_fix_commits_to_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
-        with open(file_name, 'w+') as csv_file:
-
-            issue_iterator = self.issue_generator(repo_name=repo_name, issue_label_name=issue_label_name, state=state)
-            data = next(issue_iterator, None)
-            if data:
-                dictionary_data, fields_names = data
-                writer = csv.DictWriter(csv_file, fieldnames=fields_names)
-                writer.writeheader()
-
-                writer.writerow(dictionary_data)
-                if self.log_flag:
-                    self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
-                    self.log('++++++++++++++++++++++++')
-
-            for dictionary_data, _ in issue_iterator:
-                writer.writerow(dictionary_data)
-                if self.log_flag:
-                    self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
-                    self.log('++++++++++++++++++++++++')
-
-    def write_issue_to_json_file_exception_proof(self, file_name, repo_name, issue_label_name='bug', state='closed'):
-
-        sub_exception_number = 0
-        self.exception_number += 1
-        continue_the_loop = True
-        while continue_the_loop:
-            try:
-                self.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
-                                              issue_label_name=issue_label_name, state=state)
-                continue_the_loop = False
-                self.core_api_left_tracker = 0
-                self.rate_limit_control()
-            except Exception as e:
-                extra = traceback.format_exc()
-                sub_exception_number += 1
-                starter = str(self.exception_number)+'.'+str(sub_exception_number)+'- '
-                self.log(log_str=starter + os.linesep + extra)
-                self.log(log_str='***********************' + os.linesep)
-                self.log_error(exception=e, starter=starter, extra=extra)
-                self.core_api_left_tracker = 0
-                sleep(self.waiting_after_exception)
-                self.rate_limit_control()
-
     def issue_generator(self, repo_name, issue_label_name='bug', state='closed'):
         fields_names = ['number', 'issue_number', 'repository_name', 'issue_title', 'issue_labels',
                         'issue_comments', 'issue_commit_id', 'issue_closed_commit_id',
@@ -242,6 +198,27 @@ class GitHubAnalysis:
 
             yield dictionary_data, fields_names
 
+    def write_bug_fix_commits_to_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
+        with open(file_name, 'w+') as csv_file:
+
+            issue_iterator = self.issue_generator(repo_name=repo_name, issue_label_name=issue_label_name, state=state)
+            data = next(issue_iterator, None)
+            if data:
+                dictionary_data, fields_names = data
+                writer = csv.DictWriter(csv_file, fieldnames=fields_names)
+                writer.writeheader()
+
+                writer.writerow(dictionary_data)
+                if self.log_flag:
+                    self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
+                    self.log('++++++++++++++++++++++++')
+
+            for dictionary_data, _ in issue_iterator:
+                writer.writerow(dictionary_data)
+                if self.log_flag:
+                    self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
+                    self.log('++++++++++++++++++++++++')
+
     def write_issue_to_json_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
         with open(file_name, 'w+') as json_file:
             issue_iterator = self.issue_generator(repo_name=repo_name, issue_label_name=issue_label_name, state=state)
@@ -263,6 +240,29 @@ class GitHubAnalysis:
                 if self.log_flag:
                     self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
                     self.log('++++++++++++++++++++++++')
+
+    def write_issue_to_json_file_exception_proof(self, file_name, repo_name, issue_label_name='bug', state='closed'):
+
+        sub_exception_number = 0
+        self.exception_number += 1
+        continue_the_loop = True
+        while continue_the_loop:
+            try:
+                self.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
+                                              issue_label_name=issue_label_name, state=state)
+                continue_the_loop = False
+                self.core_api_left_tracker = 0
+                self.rate_limit_control()
+            except Exception as e:
+                extra = traceback.format_exc()
+                sub_exception_number += 1
+                starter = str(self.exception_number)+'.'+str(sub_exception_number)+'- '
+                self.log(log_str=starter + os.linesep + extra)
+                self.log(log_str='***********************' + os.linesep)
+                self.log_error(exception=e, starter=starter, extra=extra)
+                self.core_api_left_tracker = 0
+                sleep(self.waiting_after_exception)
+                self.rate_limit_control()
 
     def find_similar_commit_message_to_issue_title(self, issues_json_file_address, result_issues_json_file_address,
                                                    repository_file_address):
