@@ -52,7 +52,7 @@ class GitHubAnalysis:
                 f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
-    def rate_limit_control(self, minimum_api_rate_limit=5, api_call=1):
+    def rate_limit_control(self, minimum_api_rate_limit=10, api_call=1):
 
         self.rate_limit_count += api_call
         self.core_api_left_tracker -= api_call
@@ -109,58 +109,24 @@ class GitHubAnalysis:
 
     def write_bug_fix_commits_to_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
         with open(file_name, 'w+') as csv_file:
-            fields_names = ['number', 'repository_name', 'issue_title', 'issue_commit_id',
-                            'diff_url', 'html_url', 'patch_url']
-            number, repository_name, issue_title, issue_commit_id, diff_url, html_url, patch_url = fields_names
-            writer = csv.DictWriter(csv_file, fieldnames=fields_names)
-            writer.writeheader()
-            paginated_list_issues = self.find_issues(repo_name, issue_label_name, state)
-            row_number = 1
 
-            self.rate_limit_control()  # control api rate limit call
+            issue_iterator = self.issue_generator(repo_name=repo_name, issue_label_name=issue_label_name, state=state)
+            data = next(issue_iterator, None)
+            if data:
+                dictionary_data, fields_names = data
+                writer = csv.DictWriter(csv_file, fieldnames=fields_names)
+                writer.writeheader()
 
-            for issue in paginated_list_issues:
-
-                self.rate_limit_control()  # control api rate limit call
-
-                dictionary_data = dict()
-                dictionary_data[number] = row_number
-                dictionary_data[issue_title] = issue.title.encode('utf-8')
-                dictionary_data[repository_name] = issue.repository.full_name.encode('utf-8')
-
-                self.rate_limit_control()  # control api rate limit call
-
-                paginated_list_issue_events = issue.get_events()
-                dictionary_data[issue_commit_id] = ''
-                for issue_event in paginated_list_issue_events:
-
-                    self.rate_limit_control()  # control api rate limit call
-
-                    if issue_event.event == 'merged':
-                        dictionary_data[issue_commit_id] = issue_event.commit_id.encode('utf-8')
-
-                issue_pull_request = issue.pull_request
-
-                self.rate_limit_control()  # control api rate limit call
-
-                dictionary_data[diff_url] = ''
-                dictionary_data[html_url] = ''
-                dictionary_data[patch_url] = ''
-                if issue_pull_request is not None:
-                    dictionary_data[diff_url] = issue_pull_request.diff_url.encode('utf-8')
-                    dictionary_data[html_url] = issue_pull_request.html_url.encode('utf-8')
-                    dictionary_data[patch_url] = issue_pull_request.patch_url.encode('utf-8')
-
-                line = str(row_number) + ',' + dictionary_data[repository_name] + ',' + dictionary_data[issue_title] \
-                    + ',' + dictionary_data[issue_commit_id] + ','
-                self.log(line)
-                line += dictionary_data[diff_url] + ',' + dictionary_data[html_url] + ','
-                line += dictionary_data[patch_url]
-
-                # write(line.encode('utf-8') + os.linesep)
                 writer.writerow(dictionary_data)
-                self.log('+++++++++++++++')
-                row_number += 1
+                if self.log_flag:
+                    self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
+                    self.log('++++++++++++++++++++++++')
+
+            for dictionary_data, _ in issue_iterator:
+                writer.writerow(dictionary_data)
+                if self.log_flag:
+                    self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
+                    self.log('++++++++++++++++++++++++')
 
     def write_issue_to_json_file_exception_proof(self, file_name, repo_name, issue_label_name='bug', state='closed'):
 
@@ -185,101 +151,118 @@ class GitHubAnalysis:
                 sleep(self.waiting_after_exception)
                 self.rate_limit_control()
 
+    def issue_generator(self, repo_name, issue_label_name='bug', state='closed'):
+        fields_names = ['number', 'issue_number', 'repository_name', 'issue_title', 'issue_labels',
+                        'issue_comments', 'issue_commit_id', 'issue_closed_commit_id',
+                        'diff_url', 'html_url', 'patch_url']
+
+        number_fn, issue_number_fn, repository_name_fn, issue_title_fn, issue_labels_fn, \
+            issue_comments_fn, issue_commit_id_fn, issue_closed_commit_id_fn, \
+            diff_url_fn, html_url_fn, patch_url_fn = fields_names
+
+        # json_file.write(json.dumps(fields_names, sort_keys=True))
+        # json_file.write(os.linesep)
+
+        paginated_list_issues = self.find_issues(repo_name=repo_name, issue_label_name=issue_label_name,
+                                                 state=state)
+        row_number = 1
+        self.rate_limit_control()  # control api rate limit call TODO redundant
+
+        repo_full_name = None
+        for issue in paginated_list_issues:
+
+            self.rate_limit_control()  # control api rate limit call (might redundant, only the api call first time)
+
+            dictionary_data = dict()
+            dictionary_data[number_fn] = row_number
+
+            dictionary_data[issue_number_fn] = issue.number
+
+            dictionary_data[issue_title_fn] = issue.title.encode('utf-8')
+
+            if not repo_full_name:
+                repo_full_name = issue.repository.full_name.encode('utf-8')
+                self.rate_limit_control(api_call=2)  # control api rate limit call
+
+            dictionary_data[repository_name_fn] = repo_full_name
+
+            paginated_list_issue_events = issue.get_events()
+
+            list_issue_commit_id = []
+            list_issue_closed_commit_id = []
+            for issue_event in paginated_list_issue_events:
+
+                if issue_event.event == 'merged':
+                    list_issue_commit_id.append(issue_event.commit_id.encode('utf-8'))
+                if issue_event.event == 'closed' and issue_event.commit_id:
+                    list_issue_closed_commit_id.append(issue_event.commit_id.encode('utf-8'))
+            else:
+                self.rate_limit_control()  # control api rate limit call
+
+            issue_labels = issue.get_labels()
+
+            list_issue_labels = []
+            # try:
+            for issue_label in issue_labels:
+                list_issue_labels.append(issue_label.name)
+            else:
+                self.rate_limit_control()  # control api rate limit call
+            # except SSLError as e:
+            #     extra = dictionary_data[repository_name_fn] + os.linesep + dictionary_data[issue_title_fn] \
+            #             + os.linesep + traceback.format_exc() + os.linesep
+            #     self.log_error(e, extra)
+            #     raise e
+            if len(list_issue_labels):
+                dictionary_data[issue_labels_fn] = list_issue_labels
+
+            list_issue_comments = []
+            if issue.body:
+                list_issue_comments.append(issue.body.encode('utf-8'))
+
+            paginated_list_comments = issue.get_comments()
+            for issue_comment in paginated_list_comments:
+                list_issue_comments.append(issue_comment.body.encode('utf-8'))
+            else:
+                self.rate_limit_control()  # control api rate limit call
+
+            if len(list_issue_comments):
+                dictionary_data[issue_comments_fn] = list_issue_comments
+
+            if len(list_issue_commit_id):
+                dictionary_data[issue_commit_id_fn] = list_issue_commit_id
+            if len(list_issue_closed_commit_id):
+                dictionary_data[issue_closed_commit_id_fn] = list_issue_closed_commit_id
+
+            issue_pull_request = issue.pull_request
+            if issue_pull_request is not None:
+                dictionary_data[diff_url_fn] = issue_pull_request.diff_url.encode('utf-8')
+                dictionary_data[html_url_fn] = issue_pull_request.html_url.encode('utf-8')
+                dictionary_data[patch_url_fn] = issue_pull_request.patch_url.encode('utf-8')
+            row_number += 1
+
+            yield dictionary_data, fields_names
+
     def write_issue_to_json_file(self, file_name, repo_name, issue_label_name='bug', state='closed'):
         with open(file_name, 'w+') as json_file:
-            fields_names = ['number', 'issue_number', 'repository_name', 'issue_title', 'issue_labels',
-                            'issue_comments', 'issue_commit_id', 'issue_closed_commit_id',
-                            'diff_url', 'html_url', 'patch_url']
-
-            number_fn, issue_number_fn, repository_name_fn, issue_title_fn, issue_labels_fn,\
-                issue_comments_fn, issue_commit_id_fn, issue_closed_commit_id_fn, \
-                diff_url_fn, html_url_fn, patch_url_fn = fields_names
-
-            json_file.write(json.dumps(fields_names, sort_keys=True))
-            json_file.write(os.linesep)
-
-            paginated_list_issues = self.find_issues(repo_name=repo_name, issue_label_name=issue_label_name,
-                                                     state=state)
-            row_number = 1
-            self.rate_limit_control()  # control api rate limit call TODO redundant
-
-            repo_full_name = None
-            for issue in paginated_list_issues:
-
-                self.rate_limit_control()  # control api rate limit call (might redundant, only the api call first time)
-
-                dictionary_data = dict()
-                dictionary_data[number_fn] = row_number
-
-                dictionary_data[issue_number_fn] = issue.number
-
-                dictionary_data[issue_title_fn] = issue.title.encode('utf-8')
-
-                if not repo_full_name:
-                    repo_full_name = issue.repository.full_name.encode('utf-8')
-                    self.rate_limit_control(api_call=2)  # control api rate limit call
-
-                dictionary_data[repository_name_fn] = repo_full_name
-
-                paginated_list_issue_events = issue.get_events()
-
-                list_issue_commit_id = []
-                list_issue_closed_commit_id = []
-                for issue_event in paginated_list_issue_events:
-
-                    if issue_event.event == 'merged':
-                        list_issue_commit_id.append(issue_event.commit_id.encode('utf-8'))
-                    if issue_event.event == 'closed' and issue_event.commit_id:
-                        list_issue_closed_commit_id.append(issue_event.commit_id.encode('utf-8'))
-                else:
-                    self.rate_limit_control()  # control api rate limit call
-
-                issue_labels = issue.get_labels()
-
-                list_issue_labels = []
-                # try:
-                for issue_label in issue_labels:
-                    list_issue_labels.append(issue_label.name)
-                else:
-                    self.rate_limit_control()  # control api rate limit call
-                # except SSLError as e:
-                #     extra = dictionary_data[repository_name_fn] + os.linesep + dictionary_data[issue_title_fn] \
-                #             + os.linesep + traceback.format_exc() + os.linesep
-                #     self.log_error(e, extra)
-                #     raise e
-                if len(list_issue_labels):
-                    dictionary_data[issue_labels_fn] = list_issue_labels
-
-                list_issue_comments = []
-                if issue.body:
-                    list_issue_comments.append(issue.body.encode('utf-8'))
-
-                paginated_list_comments = issue.get_comments()
-                for issue_comment in paginated_list_comments:
-                    list_issue_comments.append(issue_comment.body.encode('utf-8'))
-                else:
-                    self.rate_limit_control()  # control api rate limit call
-
-                if len(list_issue_comments):
-                    dictionary_data[issue_comments_fn] = list_issue_comments
-
-                if len(list_issue_commit_id):
-                    dictionary_data[issue_commit_id_fn] = list_issue_commit_id
-                if len(list_issue_closed_commit_id):
-                    dictionary_data[issue_closed_commit_id_fn] = list_issue_closed_commit_id
-
-                issue_pull_request = issue.pull_request
-                if issue_pull_request is not None:
-                    dictionary_data[diff_url_fn] = issue_pull_request.diff_url.encode('utf-8')
-                    dictionary_data[html_url_fn] = issue_pull_request.html_url.encode('utf-8')
-                    dictionary_data[patch_url_fn] = issue_pull_request.patch_url.encode('utf-8')
+            issue_iterator = self.issue_generator(repo_name=repo_name, issue_label_name=issue_label_name, state=state)
+            data = next(issue_iterator, None)
+            if data:
+                dictionary_data, fields_names = data
+                json_file.write(json.dumps(fields_names, sort_keys=True))
+                json_file.write(os.linesep)
 
                 json_file.write(json.dumps(dictionary_data))
                 json_file.write(os.linesep)
                 if self.log_flag:
                     self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
                     self.log('++++++++++++++++++++++++')
-                row_number += 1
+
+            for dictionary_data, _ in issue_iterator:
+                json_file.write(json.dumps(dictionary_data))
+                json_file.write(os.linesep)
+                if self.log_flag:
+                    self.log(json.dumps(dictionary_data, sort_keys=True, indent=2))
+                    self.log('++++++++++++++++++++++++')
 
     def find_similar_commit_message_to_issue_title(self, issues_json_file_address, result_issues_json_file_address,
                                                    repository_file_address):
