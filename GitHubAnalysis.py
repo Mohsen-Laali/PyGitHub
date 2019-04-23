@@ -17,7 +17,7 @@ from git.exc import GitCommandError
 
 class GitHubAnalysis:
     def __init__(self, git_hub_user_name, git_hub_password, log_flag=False, waiting_between_request=0,
-                 waiting_after_many_request=(1000, 600), waiting_after_exception=300, core_api_threshold=50,
+                 waiting_after_many_request=(1000, 600), waiting_after_exception=300, core_api_threshold=100,
                  error_log_file_name='error_log.txt'):
         self.git_hub = Github(git_hub_user_name, git_hub_password)
         self.log_flag = log_flag
@@ -52,21 +52,34 @@ class GitHubAnalysis:
                 f_handler.write(extra + os.linesep)
             f_handler.write('***********************' + os.linesep)
 
-    def rate_limit_control(self, minimum_api_rate_limit=10, api_call=1):
+    def monitoring(self):
+        core_call_left = self.git_hub.get_rate_limit().core.remaining
+        core_reset_time = self.git_hub.get_rate_limit().core.reset
+        search_call_left = self.git_hub.get_rate_limit().search.remaining
+        search_reset_time = self.git_hub.get_rate_limit().search.reset
+
+        log_str = 'search reset time ' + str(search_reset_time) + os.linesep + \
+                  'core reset time ' + str(core_reset_time) + os.linesep + \
+                  'search api left ' + str(search_call_left) + os.linesep + \
+                  'core api left ' + str(core_call_left) + os.linesep + \
+                  'internal core tracker ' + str(self.core_api_left_tracker)
+        return log_str
+
+    def rate_limit_control(self, minimum_api_rate_limit=50, api_call=1):
 
         self.rate_limit_count += api_call
         self.core_api_left_tracker -= api_call
         sleep(self.waiting_between_request)  # politeness waiting
 
+        # waiting after many requests
+        if self.rate_limit_count == self.waiting_after_many_request[0]:
+            self.log('Waiting for ' + str(self.waiting_after_many_request[1]) + ' second(s) after ' +
+                     str(self.waiting_after_many_request[0]) + ' call(s)')
+            self.log('Current time ' + str(datetime.now()))
+            sleep(self.waiting_after_many_request[1])
+
         if self.core_api_left_tracker < self.core_api_threshold or self.core_api_threshold == -1 or \
            self.core_api_left_tracker < minimum_api_rate_limit:
-
-            # waiting after many requests
-            if self.rate_limit_count == self.waiting_after_many_request[0]:
-                self.log('Waiting for ' + str(self.waiting_after_many_request[1]) + ' second(s) after ' +
-                         str(self.waiting_after_many_request[0]) + ' call(s)')
-                self.log('Current time ' + str(datetime.now()))
-                sleep(self.waiting_after_many_request[1])
 
             core_call_left = self.git_hub.get_rate_limit().core.remaining
             core_reset_time = self.git_hub.get_rate_limit().core.reset
@@ -77,7 +90,7 @@ class GitHubAnalysis:
 
             # check API limit rate
             if core_call_left < minimum_api_rate_limit or \
-               search_call_left < minimum_api_rate_limit:
+               search_call_left < 10:
 
                 # find the reset time
                 reset_time = core_reset_time
@@ -86,7 +99,7 @@ class GitHubAnalysis:
                 # Current time in the GitHub API time zone
                 current_time = datetime.now(timezone('UTC')).replace(tzinfo=None)
                 # Sleeping time with extra 600 seconds
-                sleeping_seconds = (reset_time - current_time).seconds + 600
+                sleeping_seconds = (reset_time - current_time).seconds + 60
                 log = ("Core Reach rate limit ( " + str(core_call_left) + " , " + str(core_reset_time) +
                        " API call (left, to reset time (UTC)) " + os.linesep +
                        "Search rate limit ( " + str(search_call_left) + " , " + str(search_reset_time) +
@@ -260,8 +273,14 @@ class GitHubAnalysis:
                 self.log(log_str=starter + os.linesep + extra)
                 self.log(log_str='***********************' + os.linesep)
                 self.log_error(exception=e, starter=starter, extra=extra)
-                self.core_api_left_tracker = 0
+
+                log_str = self.monitoring()
+                self.log(log_str=log_str)
+                self.log_error(exception=None, extra=None, starter=log_str)
+
                 sleep(self.waiting_after_exception)
+
+                self.core_api_left_tracker = 0
                 self.rate_limit_control()
 
     def find_similar_commit_message_to_issue_title(self, issues_json_file_address, result_issues_json_file_address,

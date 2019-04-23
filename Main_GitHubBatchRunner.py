@@ -14,7 +14,7 @@ if __name__ == '__main__':
     waiting_between_request = 0
     waiting_after_many_request = (1000, 600)
     waiting_after_exception = 300
-    core_api_threshold = 50
+    core_api_threshold = 100
 
     github_batch_runner = GitHubBatchRunner(batch_file=batch_file, output_folder=output_folder,
                                             github_user_name=github_user_name, github_password=github_password,
