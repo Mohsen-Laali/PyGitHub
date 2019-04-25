@@ -33,6 +33,7 @@ class GitHubAnalysis:
         self.core_api_threshold = core_api_threshold  # only check the api limit from github if the number jump
         # below this number of core api thresholds
         self.core_api_left_tracker = 0  # keep tracker of api call
+        self.rate_counter = 0  # count api call to periodically checks (sync) the rate limit
 
     def log(self, log_str):
         if self.log_flag:
@@ -68,18 +69,23 @@ class GitHubAnalysis:
     def rate_limit_control(self, minimum_api_rate_limit=50, api_call=1):
 
         self.rate_limit_count += api_call
+        self.rate_counter += api_call
         self.core_api_left_tracker -= api_call
+
         sleep(self.waiting_between_request)  # politeness waiting
 
         # waiting after many requests
-        if self.rate_limit_count == self.waiting_after_many_request[0]:
+        if self.rate_limit_count == self.waiting_after_many_request[0] and self.waiting_between_request[0] != -1:
             self.log('Waiting for ' + str(self.waiting_after_many_request[1]) + ' second(s) after ' +
                      str(self.waiting_after_many_request[0]) + ' call(s)')
             self.log('Current time ' + str(datetime.now()))
+            self.rate_limit_count = 0
             sleep(self.waiting_after_many_request[1])
 
         if self.core_api_left_tracker < self.core_api_threshold or self.core_api_threshold == -1 or \
-           self.core_api_left_tracker < minimum_api_rate_limit:
+           self.core_api_left_tracker < minimum_api_rate_limit or self.rate_counter > self.core_api_threshold:
+
+            self.rate_counter = 0
 
             core_call_left = self.git_hub.get_rate_limit().core.remaining
             core_reset_time = self.git_hub.get_rate_limit().core.reset
@@ -98,7 +104,7 @@ class GitHubAnalysis:
                     reset_time = search_reset_time
                 # Current time in the GitHub API time zone
                 current_time = datetime.now(timezone('UTC')).replace(tzinfo=None)
-                # Sleeping time with extra 600 seconds
+                # Sleeping time with extra 60 seconds
                 sleeping_seconds = (reset_time - current_time).seconds + 60
                 log = ("Core Reach rate limit ( " + str(core_call_left) + " , " + str(core_reset_time) +
                        " API call (left, to reset time (UTC)) " + os.linesep +
@@ -128,9 +134,6 @@ class GitHubAnalysis:
         number_fn, issue_number_fn, repository_name_fn, issue_title_fn, issue_labels_fn, \
             issue_comments_fn, issue_commit_id_fn, issue_closed_commit_id_fn, \
             diff_url_fn, html_url_fn, patch_url_fn = fields_names
-
-        # json_file.write(json.dumps(fields_names, sort_keys=True))
-        # json_file.write(os.linesep)
 
         paginated_list_issues = self.find_issues(repo_name=repo_name, issue_label_name=issue_label_name,
                                                  state=state)

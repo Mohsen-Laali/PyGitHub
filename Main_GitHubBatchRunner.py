@@ -12,7 +12,7 @@ if __name__ == '__main__':
     amend_result = True
     temp_folder = None
     waiting_between_request = 0
-    waiting_after_many_request = (1000, 600)
+    waiting_after_many_request = (-1, 600)
     waiting_after_exception = 300
     core_api_threshold = 100
 
