@@ -4,12 +4,10 @@ import csv
 from datetime import datetime, timedelta  # Current time
 from time import sleep  # Waiting time before API reset
 from pytz import timezone  # API reset timezone
-import traceback
 
 
 from github import Github
 import json
-from ssl import SSLError
 import traceback
 import git
 from git.exc import GitCommandError
@@ -26,14 +24,14 @@ class GitHubAnalysis:
         self.waiting_after_many_request = waiting_after_many_request  # (Number of request, Waiting time (seconds))
         self.rate_limit_count = 0
         self.exception_number = 0  # the exception number shows number time function is called,
-        # sub-exception shows the number of exception exception
+        self.sub_exception_number = 0  # sub-exception shows the number of exception exception
 
         self.waiting_after_exception = waiting_after_exception  # the waiting time after exception
 
         self.core_api_threshold = core_api_threshold  # only check the api limit from github if the number jump
         # below this number of core api thresholds
         self.core_api_left_tracker = 0  # keep tracker of api call
-        self.rate_counter = 0  # count api call to periodically checks (sync) the rate limit
+        self.rate_counter = 0  # count api call to periodically check (sync) the rate limit
 
     def log(self, log_str):
         if self.log_flag:
@@ -141,76 +139,102 @@ class GitHubAnalysis:
         self.rate_limit_control()  # control api rate limit call TODO redundant
 
         repo_full_name = None
+
         for issue in paginated_list_issues:
 
-            self.rate_limit_control()  # control api rate limit call (might redundant, only the api call first time)
+            continue_the_loop = True
 
-            dictionary_data = dict()
-            dictionary_data[number_fn] = row_number
+            while continue_the_loop:
+                try:
+                    self.rate_limit_control()
+                    # control api rate limit call (might redundant, only the api call first time)
 
-            dictionary_data[issue_number_fn] = issue.number
+                    dictionary_data = dict()
+                    dictionary_data[number_fn] = row_number
 
-            dictionary_data[issue_title_fn] = issue.title.encode('utf-8')
+                    dictionary_data[issue_number_fn] = issue.number
 
-            if not repo_full_name:
-                repo_full_name = issue.repository.full_name.encode('utf-8')
-                self.rate_limit_control(api_call=2)  # control api rate limit call
+                    dictionary_data[issue_title_fn] = issue.title.encode('utf-8')
 
-            dictionary_data[repository_name_fn] = repo_full_name
+                    if not repo_full_name:
+                        repo_full_name = issue.repository.full_name.encode('utf-8')
+                        self.rate_limit_control(api_call=2)  # control api rate limit call
 
-            paginated_list_issue_events = issue.get_events()
+                    dictionary_data[repository_name_fn] = repo_full_name
 
-            list_issue_commit_id = []
-            list_issue_closed_commit_id = []
-            for issue_event in paginated_list_issue_events:
+                    paginated_list_issue_events = issue.get_events()
 
-                if issue_event.event == 'merged':
-                    list_issue_commit_id.append(issue_event.commit_id.encode('utf-8'))
-                if issue_event.event == 'closed' and issue_event.commit_id:
-                    list_issue_closed_commit_id.append(issue_event.commit_id.encode('utf-8'))
-            else:
-                self.rate_limit_control()  # control api rate limit call
+                    list_issue_commit_id = []
+                    list_issue_closed_commit_id = []
+                    for issue_event in paginated_list_issue_events:
 
-            issue_labels = issue.get_labels()
+                        if issue_event.event == 'merged':
+                            list_issue_commit_id.append(issue_event.commit_id.encode('utf-8'))
+                        if issue_event.event == 'closed' and issue_event.commit_id:
+                            list_issue_closed_commit_id.append(issue_event.commit_id.encode('utf-8'))
+                    else:
+                        self.rate_limit_control()  # control api rate limit call
 
-            list_issue_labels = []
-            # try:
-            for issue_label in issue_labels:
-                list_issue_labels.append(issue_label.name)
-            else:
-                self.rate_limit_control()  # control api rate limit call
-            # except SSLError as e:
-            #     extra = dictionary_data[repository_name_fn] + os.linesep + dictionary_data[issue_title_fn] \
-            #             + os.linesep + traceback.format_exc() + os.linesep
-            #     self.log_error(e, extra)
-            #     raise e
-            if len(list_issue_labels):
-                dictionary_data[issue_labels_fn] = list_issue_labels
+                    issue_labels = issue.get_labels()
 
-            list_issue_comments = []
-            if issue.body:
-                list_issue_comments.append(issue.body.encode('utf-8'))
+                    list_issue_labels = []
+                    # try:
+                    for issue_label in issue_labels:
+                        list_issue_labels.append(issue_label.name)
+                    else:
+                        self.rate_limit_control()  # control api rate limit call
+                    # except SSLError as e:
+                    #     extra = dictionary_data[repository_name_fn] + os.linesep + dictionary_data[issue_title_fn] \
+                    #             + os.linesep + traceback.format_exc() + os.linesep
+                    #     self.log_error(e, extra)
+                    #     raise e
+                    if len(list_issue_labels):
+                        dictionary_data[issue_labels_fn] = list_issue_labels
 
-            paginated_list_comments = issue.get_comments()
-            for issue_comment in paginated_list_comments:
-                list_issue_comments.append(issue_comment.body.encode('utf-8'))
-            else:
-                self.rate_limit_control()  # control api rate limit call
+                    list_issue_comments = []
+                    if issue.body:
+                        list_issue_comments.append(issue.body.encode('utf-8'))
 
-            if len(list_issue_comments):
-                dictionary_data[issue_comments_fn] = list_issue_comments
+                    paginated_list_comments = issue.get_comments()
+                    for issue_comment in paginated_list_comments:
+                        list_issue_comments.append(issue_comment.body.encode('utf-8'))
+                    else:
+                        self.rate_limit_control()  # control api rate limit call
 
-            if len(list_issue_commit_id):
-                dictionary_data[issue_commit_id_fn] = list_issue_commit_id
-            if len(list_issue_closed_commit_id):
-                dictionary_data[issue_closed_commit_id_fn] = list_issue_closed_commit_id
+                    if len(list_issue_comments):
+                        dictionary_data[issue_comments_fn] = list_issue_comments
 
-            issue_pull_request = issue.pull_request
-            if issue_pull_request is not None:
-                dictionary_data[diff_url_fn] = issue_pull_request.diff_url.encode('utf-8')
-                dictionary_data[html_url_fn] = issue_pull_request.html_url.encode('utf-8')
-                dictionary_data[patch_url_fn] = issue_pull_request.patch_url.encode('utf-8')
-            row_number += 1
+                    if len(list_issue_commit_id):
+                        dictionary_data[issue_commit_id_fn] = list_issue_commit_id
+                    if len(list_issue_closed_commit_id):
+                        dictionary_data[issue_closed_commit_id_fn] = list_issue_closed_commit_id
+
+                    issue_pull_request = issue.pull_request
+                    if issue_pull_request is not None:
+                        dictionary_data[diff_url_fn] = issue_pull_request.diff_url.encode('utf-8')
+                        dictionary_data[html_url_fn] = issue_pull_request.html_url.encode('utf-8')
+                        dictionary_data[patch_url_fn] = issue_pull_request.patch_url.encode('utf-8')
+
+                    row_number += 1
+
+                    continue_the_loop = False
+
+                except Exception as e:
+                    extra = traceback.format_exc()
+                    self.sub_exception_number += 1
+                    starter = str(self.exception_number) + '.' + str(self.sub_exception_number) + '- '
+                    self.log(log_str=starter + os.linesep + extra)
+                    self.log(log_str='***********************' + os.linesep)
+                    self.log_error(exception=e, starter=starter, extra=extra)
+
+                    log_str = self.monitoring()
+                    self.log(log_str=log_str)
+                    self.log_error(exception=None, extra=None, starter=log_str)
+
+                    sleep(self.waiting_after_exception)
+
+                    self.core_api_left_tracker = 0
+                    self.rate_limit_control()
 
             yield dictionary_data, fields_names
 
@@ -259,7 +283,7 @@ class GitHubAnalysis:
 
     def write_issue_to_json_file_exception_proof(self, file_name, repo_name, issue_label_name='bug', state='closed'):
 
-        sub_exception_number = 0
+        self.sub_exception_number = 0
         self.exception_number += 1
         continue_the_loop = True
         while continue_the_loop:
@@ -271,8 +295,8 @@ class GitHubAnalysis:
                 self.rate_limit_control()
             except Exception as e:
                 extra = traceback.format_exc()
-                sub_exception_number += 1
-                starter = str(self.exception_number)+'.'+str(sub_exception_number)+'- '
+                self.sub_exception_number += 1
+                starter = str(self.exception_number)+'.'+str(self.sub_exception_number)+'- '
                 self.log(log_str=starter + os.linesep + extra)
                 self.log(log_str='***********************' + os.linesep)
                 self.log_error(exception=e, starter=starter, extra=extra)
