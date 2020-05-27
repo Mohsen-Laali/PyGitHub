@@ -310,7 +310,8 @@ class GitHubAnalysis:
                 self.core_api_left_tracker = 0
                 self.rate_limit_control()
 
-    def find_similar_commit_message_to_issue_title(self, issues_json_file_address, result_issues_json_file_address,
+    @staticmethod
+    def find_similar_commit_message_to_issue_title(issues_json_file_address, result_issues_json_file_address,
                                                    repository_file_address):
 
         repo = git.Repo(path=repository_file_address)
@@ -319,10 +320,15 @@ class GitHubAnalysis:
             try:
                 repo.git.cat_file(hash_commit_to_test, t=True)
             except GitCommandError as e:
-                if e.stderr == 'fatal: git cat-file: could not get object info':
-                    return False
-                else:
-                    raise e
+                # remember to delete and fix this
+                return False
+                # finish part
+                #  this part of code temporary commented out
+                # if e.stderr == 'fatal: git cat-file: could not get object info':
+                #     return False
+                # else:
+                #     raise e
+                # finish temporary comment
             return True
 
         with open(issues_json_file_address, 'r+') as issues_json_file_handler, \
@@ -370,12 +376,14 @@ class GitHubAnalysis:
                     if not json_line['issue_commit_id']:
                         del json_line['issue_commit_id']
                     # map(set_discovered_commits.add, json_line['issue_commit_id'])
-
-                issue_title = json_line['issue_title']
-                log_commit_ids = repo.git.log(all=True, grep=issue_title, pretty='format:%H', i=True,
-                                              F=True)
+                # add quote
+                issue_title = "'" + json_line['issue_title'] + "'"
+                # pretty='format:%H' only print sha
+                # i=True ignore a case
+                # F=True don't interpret as a regular expression
+                log_commit_ids = repo.git.log(all=True, grep=issue_title, pretty='format:%H', i=True, F=True)
                 if len(log_commit_ids) > 0:
-                    similar_commit_ids = [l.strip() for l in log_commit_ids.split(os.linesep)]
+                    similar_commit_ids = [log.strip() for log in log_commit_ids.split(os.linesep)]
 
                     def filter_append(c):
                         if c and c not in set_discovered_commits:
@@ -384,8 +392,10 @@ class GitHubAnalysis:
                     list(map(filter_append, similar_commit_ids))
                 json_line[field_similar_commit_to_issue_title] = list(set_similar_commit_ids)
                 result_issues_file_handler.write(json.dumps(json_line) + os.linesep)
-                self.log('******************************')
-                self.log(json_line)
+                print('******************************')
+                print(json.dumps(json_line, sort_keys=True, indent=2))
+                # self.log('******************************')
+                # self.log(json.dumps(json_line, sort_keys=True, indent=2))
 
     def convert_json_csv(self, json_file_address, csv_file_address, list_ignored_columns=None):
 

@@ -25,8 +25,11 @@ if __name__ == '__main__':
                                             waiting_after_exception=waiting_after_exception,
                                             core_api_threshold=core_api_threshold)
 
-    github_batch_runner.run_batch()
+    # github_batch_runner.run_batch()
     # github_batch_runner.check_repos()
+
+    amend_batch_file = 'java_issue_amendment.json'
+    github_batch_runner.amend_issue(batch_file_address=amend_batch_file)
 
 
 

@@ -6,9 +6,10 @@ import traceback
 
 from github import Github
 from GitHubAnalysis import GitHubAnalysis
+from git import Repo
 
 
-class Repo:
+class RepoDetails:
     def __init__(self, repo_name, bug_issue_labels=None):
         if not bug_issue_labels:
             self.bug_issue_labels = []
@@ -44,6 +45,7 @@ class GitHubBatchRunner:
             print(log_str)
 
     def log_error(self, exception, starter=None, extra=None):
+
         with open(self.error_log_file_name, 'a') as f_handler:
             if starter:
                 f_handler.write(starter + os.linesep)
@@ -128,7 +130,7 @@ class GitHubBatchRunner:
                 raise e
             try:
                 bug_issue_labels = json_repo['bug_issue_labels']
-                list_repos.append(Repo(repo_name=repo_name, bug_issue_labels=bug_issue_labels))
+                list_repos.append(RepoDetails(repo_name=repo_name, bug_issue_labels=bug_issue_labels))
                 for bug_issue_label in bug_issue_labels:
                     repo.get_label(bug_issue_label)
                     message = 'Repo: ' + bug_issue_label + ' is retrieved successfully'
@@ -154,5 +156,53 @@ class GitHubBatchRunner:
                 list_json_repo.append(json_repo)
 
         return list_json_repo
+
+    @staticmethod
+    def amend_issue(batch_file_address):
+        json_list = []
+        with open(batch_file_address, 'r+') as file_handler:
+            for json_line in file_handler:
+                json_list.append(json.loads(json_line))
+
+        repo_base_address = json_list[0]["repo_base_address"]
+        issue_base_address = json_list[0]["issue_base_address"]
+        output_issue_base_address = json_list[0]["output_issue_base_address"]
+
+        for json_issue_details in json_list[1:]:
+            print "Start " + json_issue_details['repo_name']
+            print "***********************"
+            # creat folder for the repo
+            repo_address = os.path.join(repo_base_address, json_issue_details["repo_name"])
+            os.makedirs(repo_address)
+            # cloning the repo
+            repo = Repo()
+            repo = repo.clone_from(json_issue_details['repo_clone_address'], repo_address)
+            # filter commit base on the last scanned issue
+            str_filter_date = json_issue_details['filtered_date']
+            filter_date = datetime.strptime(str_filter_date, "%Y-%m-%d")
+            # get all commit id after the filter date
+            # log_commit_ids = repo.git.log(since=filter_date.date(), pretty='format:%H')
+            log_commit_ids = repo.git.log(since=filter_date.date(), pretty='format:%H')
+            commit_sha = [log.strip() for log in log_commit_ids.split(os.linesep)][-1]
+            # check if there is any commit after the filter date
+            if commit_sha:
+                print commit_sha
+                repo.git.reset(commit_sha, hard=True)
+
+            issue_file_address = os.path.join(issue_base_address, json_issue_details["issue_file_name"])
+            issue_output_file_address = os.path.join(output_issue_base_address,
+                                                     json_issue_details["issue_output_file_name"])
+
+            GitHubAnalysis.find_similar_commit_message_to_issue_title(issues_json_file_address=issue_file_address,
+                                                                      result_issues_json_file_address=
+                                                                      issue_output_file_address,
+                                                                      repository_file_address=repo_address)
+            print "End " + json_issue_details['repo_name']
+            print "***********************"
+
+
+
+
+
 
 

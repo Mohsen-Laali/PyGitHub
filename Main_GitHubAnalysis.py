@@ -47,13 +47,13 @@ if __name__ == '__main__':
     git_hub_password = 'GitHub1'
     git_hub_analysis = GitHubAnalysis(git_hub_user_name=git_hub_user_name, git_hub_password=git_hub_password,
                                       log_flag=log_flag)
-
-    repo_name = 'ReactiveX/RxJava'
-    issue_label_name = 'Bug'
-    file_name = 'rx_java_bug_fix_issues.json'
-    git_hub_analysis.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
-                                              issue_label_name=issue_label_name)
-    print(repo_name + 'is finished')
+    #
+    # repo_name = 'ReactiveX/RxJava'
+    # issue_label_name = 'Bug'
+    # file_name = 'rx_java_bug_fix_issues.json'
+    # git_hub_analysis.write_issue_to_json_file(file_name=file_name, repo_name=repo_name,
+    #                                           issue_label_name=issue_label_name)
+    # print(repo_name + 'is finished')
 
     # repo_name = 'elastic/elasticsearch'
     # issue_label_name = 'bug'
@@ -175,11 +175,17 @@ if __name__ == '__main__':
     #                                                             result_issues_json_file_address,
     #                                                             repository_file_address=repository_file_address)
 
-    issues_json_file_address = '/home/mohsen/PycharmProjects/PyGithub/Output/All_issues/elastic_search_issues.json'
+    # issues_json_file_address = '/home/mohsen/PycharmProjects/PyGithub/Output/All_issues/elastic_search_issues.json'
+    # result_issues_json_file_address = \
+    #     '/home/mohsen/PycharmProjects/PyGithub/Output/All_Issues_Similar_Commits_Amendment/' \
+    #     'elastic_search_issues_amendment.json'
+    # repository_file_address = '/home/mohsen/git/Human_Factor/Sample_Git_Repository/elasticsearch_17_Feb'
+
+    issues_json_file_address = '/home/mohsen/git/GitHub_Issues/C#_Repos/EntityFrameworkCore_issues_2019_05_01.json'
     result_issues_json_file_address = \
-        '/home/mohsen/PycharmProjects/PyGithub/Output/All_Issues_Similar_Commits_Amendment/' \
-        'elastic_search_issues_amendment.json'
-    repository_file_address = '/home/mohsen/git/Human_Factor/Sample_Git_Repository/elasticsearch_17_Feb'
+        '/home/mohsen/git/GitHub_Issues/C#_Repos/' \
+        'EntityFrameworkCore_issues_2019_05_01_amendment.json'
+    repository_file_address = '/home/mohsen/git/Temp/Temp_Repositories/Temp_C_Sharp_Repositories/EntityFrameworkCore'
 
     git_hub_analysis.find_similar_commit_message_to_issue_title(issues_json_file_address=issues_json_file_address,
                                                                 result_issues_json_file_address=
