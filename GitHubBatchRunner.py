@@ -175,8 +175,7 @@ class GitHubBatchRunner:
             repo_address = os.path.join(repo_base_address, json_issue_details["repo_name"])
             os.makedirs(repo_address)
             # cloning the repo
-            repo = Repo()
-            repo = repo.clone_from(json_issue_details['repo_clone_address'], repo_address)
+            repo = Repo.clone_from(json_issue_details['repo_clone_address'], repo_address)
             # filter commit base on the last scanned issue
             str_filter_date = json_issue_details['filtered_date']
             filter_date = datetime.strptime(str_filter_date, "%Y-%m-%d")
