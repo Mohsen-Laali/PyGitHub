@@ -381,7 +381,7 @@ class GitHubAnalysis:
                 # pretty='format:%H' only print sha
                 # i=True ignore a case
                 # F=True don't interpret as a regular expression
-                log_commit_ids = repo.git.log(all=True, grep=issue_title, pretty='format:%H', i=True, F=True)
+                log_commit_ids = repo.git.log(grep=issue_title, pretty='format:%H', i=True, F=True)
                 if len(log_commit_ids) > 0:
                     similar_commit_ids = [log.strip() for log in log_commit_ids.split(os.linesep)]
 

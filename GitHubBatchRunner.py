@@ -167,15 +167,21 @@ class GitHubBatchRunner:
         repo_base_address = json_list[0]["repo_base_address"]
         issue_base_address = json_list[0]["issue_base_address"]
         output_issue_base_address = json_list[0]["output_issue_base_address"]
+        clone_repo = json_list[0]['clone_repo']
 
         for json_issue_details in json_list[1:]:
             print "Start " + json_issue_details['repo_name']
             print "***********************"
             # creat folder for the repo
             repo_address = os.path.join(repo_base_address, json_issue_details["repo_name"])
-            os.makedirs(repo_address)
-            # cloning the repo
-            repo = Repo.clone_from(json_issue_details['repo_clone_address'], repo_address)
+            if clone_repo:
+                os.makedirs(repo_address)
+                # cloning the repo
+                repo = Repo.clone_from(json_issue_details['repo_clone_address'], repo_address)
+            else:
+                # connect to the repo
+                repo = Repo(path=repo_address)
+
             # filter commit base on the last scanned issue
             str_filter_date = json_issue_details['filtered_date']
             filter_date = datetime.strptime(str_filter_date, "%Y-%m-%d")
