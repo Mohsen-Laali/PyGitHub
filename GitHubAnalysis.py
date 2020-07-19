@@ -4,6 +4,7 @@ import csv
 from datetime import datetime, timedelta  # Current time
 from time import sleep  # Waiting time before API reset
 from pytz import timezone  # API reset timezone
+from exceptions import TypeError
 
 
 from github import Github
@@ -37,8 +38,13 @@ class GitHubAnalysis:
         if self.log_flag:
             print(log_str)
 
-    def log_error(self, exception, extra=None, starter=None):
-        with open(self.error_log_file_name, 'a') as f_handler:
+    def log_error(self, exception, starter=None, extra=None):
+        GitHubAnalysis.static_log_error(exception=exception, starter=starter,
+                                           extra=extra, error_log_file_name=self.error_log_file_name)
+
+    @staticmethod
+    def static_log_error(exception, starter=None, extra=None, error_log_file_name='error_log.txt'):
+        with open(error_log_file_name, 'a') as f_handler:
             if starter:
                 f_handler.write(starter + os.linesep)
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -312,7 +318,7 @@ class GitHubAnalysis:
 
     @staticmethod
     def find_similar_commit_message_to_issue_title(issues_json_file_address, result_issues_json_file_address,
-                                                   repository_file_address):
+                                                   repository_file_address, error_log_file_name='error_log.txt'):
 
         repo = git.Repo(path=repository_file_address)
 
@@ -376,20 +382,28 @@ class GitHubAnalysis:
                     if not json_line['issue_commit_id']:
                         del json_line['issue_commit_id']
                     # map(set_discovered_commits.add, json_line['issue_commit_id'])
-                # add quote
-                issue_title = "'" + json_line['issue_title'] + "'"
+                issue_title = json_line['issue_title'].encode('utf8') if json_line['issue_title'] else ""
                 # pretty='format:%H' only print sha
                 # i=True ignore a case
                 # F=True don't interpret as a regular expression
-                log_commit_ids = repo.git.log(grep=issue_title, pretty='format:%H', i=True, F=True)
-                if len(log_commit_ids) > 0:
-                    similar_commit_ids = [log.strip() for log in log_commit_ids.split(os.linesep)]
+                if issue_title:
+                    try:
+                        log_commit_ids = repo.git.log(grep=issue_title, pretty='format:%H', i=True, F=True)
+                    except TypeError as e:
+                        GitHubAnalysis.\
+                            static_log_error(exception=e,
+                                             starter='Error (Finding a similar git commit with the issue title)',
+                                             extra='Issue Number: '+str(json_line['issue_number']),
+                                             error_log_file_name=error_log_file_name)
+                        log_commit_ids = ''
+                    if len(log_commit_ids) > 0:
+                        similar_commit_ids = [log.strip() for log in log_commit_ids.split(os.linesep)]
 
-                    def filter_append(c):
-                        if c and c not in set_discovered_commits:
-                            set_similar_commit_ids.add(c)
+                        def filter_append(c):
+                            if c and c not in set_discovered_commits:
+                                set_similar_commit_ids.add(c)
 
-                    list(map(filter_append, similar_commit_ids))
+                        list(map(filter_append, similar_commit_ids))
                 json_line[field_similar_commit_to_issue_title] = list(set_similar_commit_ids)
                 result_issues_file_handler.write(json.dumps(json_line) + os.linesep)
                 print('******************************')

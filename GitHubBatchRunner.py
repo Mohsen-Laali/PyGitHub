@@ -45,19 +45,8 @@ class GitHubBatchRunner:
             print(log_str)
 
     def log_error(self, exception, starter=None, extra=None):
-
-        with open(self.error_log_file_name, 'a') as f_handler:
-            if starter:
-                f_handler.write(starter + os.linesep)
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-            f_handler.write(current_time + os.linesep)
-            if hasattr(exception, 'message') and exception:
-                f_handler.write(str(exception.message) + os.linesep)
-            elif exception:
-                f_handler.write(str(exception) + os.linesep)
-            if extra:
-                f_handler.write(extra + os.linesep)
-            f_handler.write('***********************' + os.linesep)
+        GitHubAnalysis.static_log_error(exception=exception, starter=starter,
+                                        extra=extra, error_log_file_name=self.error_log_file_name)
 
     def creat_folder(self, folder_path):
         try:
@@ -158,7 +147,7 @@ class GitHubBatchRunner:
         return list_json_repo
 
     @staticmethod
-    def amend_issue(batch_file_address):
+    def amend_issue(batch_file_address, error_log_file_name='error_log.txt'):
         json_list = []
         with open(batch_file_address, 'r+') as file_handler:
             for json_line in file_handler:
@@ -178,21 +167,16 @@ class GitHubBatchRunner:
                 os.makedirs(repo_address)
                 # cloning the repo
                 repo = Repo.clone_from(json_issue_details['repo_clone_address'], repo_address)
-            else:
-                # connect to the repo
-                repo = Repo(path=repo_address)
-
-            # filter commit base on the last scanned issue
-            str_filter_date = json_issue_details['filtered_date']
-            filter_date = datetime.strptime(str_filter_date, "%Y-%m-%d")
-            # get all commit id after the filter date
-            # log_commit_ids = repo.git.log(since=filter_date.date(), pretty='format:%H')
-            log_commit_ids = repo.git.log(since=filter_date.date(), pretty='format:%H')
-            commit_sha = [log.strip() for log in log_commit_ids.split(os.linesep)][-1]
-            # check if there is any commit after the filter date
-            if commit_sha:
-                print commit_sha
-                repo.git.reset(commit_sha, hard=True)
+                # filter commit base on the last scanned issue
+                str_filter_date = json_issue_details['filtered_date']
+                filter_date = datetime.strptime(str_filter_date, "%Y-%m-%d")
+                # get all commit id after the filter date
+                log_commit_ids = repo.git.log(since=filter_date.date(), pretty='format:%H')
+                commit_sha = [log.strip() for log in log_commit_ids.split(os.linesep)][-1]
+                # check if there is any commit after the filter date
+                if commit_sha:
+                    print commit_sha
+                    repo.git.reset(commit_sha, hard=True)
 
             issue_file_address = os.path.join(issue_base_address, json_issue_details["issue_file_name"])
             issue_output_file_address = os.path.join(output_issue_base_address,
@@ -201,7 +185,8 @@ class GitHubBatchRunner:
             GitHubAnalysis.find_similar_commit_message_to_issue_title(issues_json_file_address=issue_file_address,
                                                                       result_issues_json_file_address=
                                                                       issue_output_file_address,
-                                                                      repository_file_address=repo_address)
+                                                                      repository_file_address=repo_address,
+                                                                      error_log_file_name=error_log_file_name)
             print "End " + json_issue_details['repo_name']
             print "***********************"
 
